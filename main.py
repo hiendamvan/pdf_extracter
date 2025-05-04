@@ -1,10 +1,11 @@
 import csv
 import pdfplumber
+from fpdf import FPDF
 
 content = ''
+MAX_LINE_LENGTH = 1000  # Giới hạn độ dài tối đa của một dòng
 
 def normalize_header(header):
-    #print(header)
     """
     Chuẩn hóa tên cột để dễ truy cập (xóa \n, lowercase)
     """
@@ -20,7 +21,6 @@ def normalize_combined_header(header_rows):
             if(header_rows[i][j] == None):
                 header_rows[i][j] = header_rows[i][j-1]
     combined = [str(header_rows[0][i]).strip() + " " + str(header_rows[1][i]).strip() for i in range(len(header_rows[0]))]
-    #print(combined)
     return combined
 
 def row_to_text(row, header):
@@ -32,14 +32,13 @@ def row_to_text(row, header):
         value = value.strip() if isinstance(value, str) else str(value)
         if value == '-' or value == '':
             value = "không công bố"
-        parts.append(f"{col_name}: {value}")
-    return "; ".join(parts) + "."
+        parts.append(f"{col_name} là {value}")
+    return " với ".join(parts) + "."
 
 def table_to_docs(table):
     """
     Nhận vào bảng dạng list of lists → list văn bản
     """
-
     if any(cell is None for cell in table[0]):
         raw_header = table[0:2]
         rows = table[2:]
@@ -52,11 +51,25 @@ def table_to_docs(table):
     docs = []
     for row in rows:
         if len(row) != len(header):
-            # Bỏ qua dòng không khớp số cột
             continue
         doc = row_to_text(row, header)
         docs.append(doc)
     return docs
+
+def split_text_by_length(text, max_length=MAX_LINE_LENGTH):
+    """
+    Hàm này chia nhỏ văn bản thành các đoạn nhỏ hơn theo giới hạn độ dài
+    """
+    lines = []
+    while len(text) > max_length:
+        split_point = text.rfind(' ', 0, max_length)  # Cắt tại vị trí có khoảng trắng gần nhất
+        if split_point == -1:
+            split_point = max_length  # Nếu không tìm thấy, chia ngay tại vị trí max_length
+        lines.append(text[:split_point])
+        text = text[split_point:].lstrip()  # Cập nhật phần còn lại
+    if text:
+        lines.append(text)
+    return lines
 
 with pdfplumber.open("fixed.pdf") as pdf:
     for i, page in enumerate(pdf.pages):
@@ -84,17 +97,17 @@ with pdfplumber.open("fixed.pdf") as pdf:
 
         # 3. Ghép lại thành văn bản (nếu cần)
         text = " ".join(w["text"] for w in non_table_words)
-        content += text
+        for line in split_text_by_length(text):  # Chia nhỏ văn bản nếu cần
+            content += line + "\n"
 
         # 4. Xử lý bảng riêng
         for table in tables:
             docs = table_to_docs(table=table)
             for doc in docs:
-                content+=doc
-        
-        content+='\n'
-            
+                for line in split_text_by_length(doc):  # Chia nhỏ văn bản của bảng
+                    content += line + "\n"
+
+        content += '\n'
+
 with open("output.txt", "w", encoding="utf-8") as f:
     f.write(content)
-
-
