@@ -20,6 +20,8 @@ def normalize_combined_header(header_rows):
         for j in range(1, len(header_rows[0])):
             if(header_rows[i][j] == None):
                 header_rows[i][j] = header_rows[i][j-1]
+            if(header_rows[i][j] == 'TT' or header_rows[i][j] == 'STT'):
+                header_rows[i][j] = ''
     combined = [str(header_rows[0][i]).strip() + " " + str(header_rows[1][i]).strip() for i in range(len(header_rows[0]))]
     return combined
 
@@ -33,7 +35,7 @@ def row_to_text(row, header):
         if value == '-' or value == '':
             value = "không công bố"
         parts.append(f"{col_name} là {value}")
-    return " với ".join(parts) + "."
+    return ", ".join(parts) + "."
 
 def table_to_docs(table):
     """
